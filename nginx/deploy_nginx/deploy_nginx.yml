@@ -50,6 +50,10 @@
       template: src=etc_sysctl_conf.j2 dest=/etc/sysctl.conf
     - name: enable etc sysctl conf
       command: sysctl -p
+    
+    - name: set cpu frequency-performance
+      shell: cpupower  frequency-set -g performance
+      ignore_errors: True
 
 - hosts: server
   tasks:

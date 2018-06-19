@@ -1,0 +1,16 @@
+1.install ansible and configure ssh on deploy host
+#192.168.122.140 nginx_server
+#192.168.122.22 nginx_client
+yum install ansible
+ssh-keygen
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.122.140
+ssh-copy-id -i /root/.ssh/id_rsa.pub root@192.168.122.22
+
+2.configure server and  client IP
+vim deploy_nginx/inventory/deploy_hosts
+
+3.configure 40G NIC IP
+vim deploy_nginx/template/run_nginx.j2
+
+4.deploy and test nginx
+ansible-playbook -i inventory/deploy_hosts deploy_nginx.yml

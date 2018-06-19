@@ -1,0 +1,128 @@
+#**********************************************************************************
+##author: peipei.ning@hxt-semitech.com
+##initial creation: 2018.4.26
+##description:  nginx deploy script
+##usage: need root user to run the script
+##***********************************************************************************
+##Revision History:
+## ---date---  ----author----   -----change------  ------detail--------------
+## 2018.4.26    Ning Peipei     initial creation   The first version to deploy nginx
+##***********************************************************************************
+##Here is a script(deploy_nginx.yml) to deploy nginx:
+
+- hosts: servers
+  tasks:
+    - name: stop firewalld,if running
+      service: 
+          name: firewalld
+          state: stopped
+          enabled: no
+
+    - name: stop postfix,if running
+      service: 
+          name: postfix
+          state: stopped
+          enabled: no
+
+    - name: install psmisc
+      yum: name=psmisc state=present
+    - name: close audit
+      shell: killall auditd
+      ignore_errors: True 
+
+
+    - name: stop selinux
+      shell: setenforce 0
+      ignore_errors: True
+    - name:
+      shell: mv /etc/selinux/config /etc/selinux/config.bak
+      ignore_errors: True
+    - name:
+      template: src=selinux_config.j2 dest=/etc/selinux/config    
+
+    - name: configure etc profile
+      template: src=etc_profile.j2 dest=/etc/profile
+    - name: enable etc profile
+      shell: source /etc/profile
+      ignore_errors: True
+
+    - name: configure etc sysctl conf
+      template: src=etc_sysctl_conf.j2 dest=/etc/sysctl.conf
+    - name: enable etc sysctl conf
+      command: sysctl -p
+
+- hosts: server
+  tasks:
+    - name: Install dependencies
+      yum: name={{item}} state=present
+      with_items:
+        - pcre-devel
+        - zlib-devel
+        - openssl
+        - openssl-devel
+        - gcc
+        - wget
+        - make
+        - gcc-c++
+ 
+    - name: download nginx source code
+      get_url:
+        url: http://nginx.org/download/nginx-1.10.3.tar.gz
+        dest: /root
+        mode: 777
+    - name: tar nginx
+      command: tar -xvf /root/nginx-1.10.3.tar.gz
+    - name: configure nginx
+      shell: ./configure --prefix=/usr/local
+      args:
+        chdir: /root/nginx-1.10.3
+      ignore_errors: True
+    - name: make nginx
+      shell: make
+      args:
+        chdir: /root/nginx-1.10.3
+      ignore_errors: True
+    - name: install nginx
+      shell: make install
+      args:
+        chdir: /root/nginx-1.10.3
+      ignore_errors: True
+
+
+    - name: change nginx.conf
+      command: mv /usr/local/conf/nginx.conf /usr/local/conf/nginx.conf.bak
+    - name: edit nginx.conf
+      template: src=nginx_conf.j2 dest=/usr/local/conf/nginx.conf
+    - name: run reload conf file
+      shell: /usr/local/sbin/nginx -c /usr/local/conf/nginx.conf
+      ignore_errors: True    
+
+- hosts: client
+  tasks:
+    - name: install gcc git
+      yum: name={{item}} state=present
+      with_items:
+        - git
+        - gcc
+    - name: download wrk
+      get_url:
+        url: https://github.com/wg/wrk/archive/4.1.0.tar.gz
+        dest: /root
+        mode: 0644
+    - name: tar wrk
+      command: tar -xvf wrk-4.1.0.tar.gz
+    - name: init
+      shell: git init
+      args: 
+        chdir: /root/wrk-4.1.0/
+      ignore_errors: True
+    - name: make wrk
+      shell: make
+      args: 
+        chdir: /root/wrk-4.1.0/
+      ignore_errors: True
+    - name: run test script
+      template: src=run_nginx.j2 dest=/root/run_nginx.sh mode=744
+    - name: run 
+      shell: /usr/bin/sh /root/run_nginx.sh
+      ignore_errors: True
